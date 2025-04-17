@@ -221,7 +221,92 @@ function updateUI() {
         )
       }]
     },
-    options: {
+          options: {
       responsive: true,
       scales: {
-        y:
+        y: {
+          beginAtZero: true,
+          ticks: {
+            precision: 0
+          }
+        }
+      },
+      plugins: {
+        legend: {
+          display: false
+        }
+      }
+    }
+  });
+  
+  // Update detailed table
+  const tableBody = document.getElementById('detailedTable');
+  tableBody.innerHTML = '';
+  
+  stats.topStocks.forEach(stock => {
+    const tr = document.createElement('tr');
+    
+    // Ticker cell
+    const tickerCell = document.createElement('td');
+    tickerCell.innerHTML = `<strong>${stock.ticker}</strong>`;
+    tr.appendChild(tickerCell);
+    
+    // Mentions cell
+    const mentionsCell = document.createElement('td');
+    mentionsCell.textContent = stock.mentions;
+    tr.appendChild(mentionsCell);
+    
+    // Sentiment cell
+    const sentimentCell = document.createElement('td');
+    let sentimentText, sentimentClass;
+    
+    if (stock.sentiment > 0.5) {
+      sentimentText = 'Bullish';
+      sentimentClass = 'sentiment-bullish';
+    } else if (stock.sentiment < -0.5) {
+      sentimentText = 'Bearish';
+      sentimentClass = 'sentiment-bearish';
+    } else {
+      sentimentText = 'Neutral';
+      sentimentClass = 'sentiment-neutral';
+    }
+    
+    sentimentCell.innerHTML = `<span class="${sentimentClass}">${sentimentText}</span>`;
+    tr.appendChild(sentimentCell);
+    
+    // Users cell
+    const usersCell = document.createElement('td');
+    usersCell.textContent = stock.uniqueUsers;
+    tr.appendChild(usersCell);
+    
+    // Context cell
+    const contextCell = document.createElement('td');
+    if (stock.contexts && stock.contexts.length > 0) {
+      const latestContext = stock.contexts[stock.contexts.length - 1];
+      contextCell.innerHTML = `
+        <div class="context-quote">${latestContext.text}</div>
+        <small class="text-muted">by ${latestContext.username} - ${new Date(latestContext.timestamp).toLocaleTimeString()}</small>
+      `;
+    } else {
+      contextCell.textContent = 'No context available';
+    }
+    tr.appendChild(contextCell);
+    
+    tableBody.appendChild(tr);
+  });
+  
+  // Show summary container
+  document.getElementById('summaryContainer').style.display = 'block';
+  
+  // Apply mobile-specific optimizations
+  applyMobileOptimizations();
+  
+  // Hide loading screen
+  hideLoading();
+  
+  // Update refresh timestamp for mobile view
+  const timestampEl = document.getElementById('mobileTimestamp');
+  if (timestampEl) {
+    timestampEl.textContent = new Date().toLocaleTimeString();
+  }
+}

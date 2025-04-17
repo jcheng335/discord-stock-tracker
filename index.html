@@ -1,1 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#7289da">
+    <title>Discord Stock Summarizer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            padding-top: 20px;
+            padding-bottom: 70px; /* Add space for mobile navbar */
+        }
+        .navbar {
+            background-color: #7289da !important;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .navbar-brand {
+            color: white !important;
+            font-weight: bold;
+        }
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            font-weight: bold;
+            background-color: #f1f3f5;
+        }
+        .btn-discord {
+            background-color: #7289da;
+            color: white;
+        }
+        .btn-discord:hover {
+            background-color: #5e78d5;
+            color: white;
+        }
+        .sentiment-bullish {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .sentiment-bearish {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .sentiment-neutral {
+            color: #6c757d;
+            font-weight: bold;
+        }
+        #summaryContainer {
+            display: none;
+        }
+        .ticker-badge {
+            font-size: 1rem;
+            padding: 0.5rem;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+            display: inline-block;
+            background: #e9ecef;
+            border-radius: 15px;
+        }
+        .context-quote {
+            font-style: italic;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-left: 3px solid #7289da;
+            margin: 10px 0;
+        }
+        #loadingScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255,255,255,0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        /* Mobile-specific styles */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .card {
+                margin-bottom: 15px;
+            }
+            
+            .card-header {
+                padding: 10px 15px;
+            }
+            
+            .card-body {
+                padding: 15px;
+            }
+            
+            .table-responsive {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            .navbar {
+                padding: 5px;
+            }
+            
+            .nav-link {
+                padding: 5px 10px;
+            }
+            
+            .btn {
+                padding: 6px 12px;
+                margin: 5px 2px;
+            }
+            
+            .ticker-badge {
+                font-size: 0.9rem;
+                padding: 5px 10px;
+            }
+            
+            /* Adjust chart sizes */
+            canvas {
+                height: 250px !important;
+            }
+            
+            /* Stack buttons on mobile */
+            .btn-group {
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .btn-group .btn {
+                border-radius: 5px !important;
+                margin: 2px 0;
+            }
+            
+            /* Fix for inputs on mobile */
+            input[type="number"],
+            input[type="text"],
+            input[type="password"] {
+                font-size: 16px; /* Prevents iOS zoom */
+            }
+            
+            /* Improve mobile form layout */
+            .form-label {
+                font-weight: 600;
+            }
+            
+            /* Better spacing for mobile views */
+            .mb-3 {
+                margin-bottom: 1rem !important;
+            }
+            
+            /* Fix table display on mobile */
+            .table th, .table td {
+                padding: 8px 5px;
+                font-size: 0.9rem;
+            }
+            
+            /* Add pull-to-refresh visual indicator */
+            .pull-to-refresh {
+                text-align: center;
+                height: 40px;
+                line-height: 40px;
+                color: #7289da;
+                display: none;
+            }
+            
+            #detailedTable td:nth-child(5) { /* Context column */
+                max-width: 150px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+        }
+        
+        /* Add home screen icon styles */
+        .pwa-install-prompt {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 15px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            display: none;
+            z-index: 1001;
+        }
+        
+        /* Mobile bottom navbar */
+        .mobile-navbar {
+            display: none;
+        }
+        
+        @media (max-width: 768px) {
+            .mobile-navbar {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#">Discord Stock Summarizer</a>
+        </div>
+    </nav>
 
+    <div id="loadingScreen" style="display:none;">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-3" id="loadingMessage">Processing messages...</p>
+    </div>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Setup Discord Integration</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>To use this tool, you need to provide your Discord authentication token. This token is used only within your browser and is never sent to any server.</p>
+                        <p><strong>IMPORTANT:</strong> Never share your Discord token with anyone, and only use this tool on devices you trust!</p>
+                        
+                        <div class="mb-3">
+                            <label for="discordToken" class="form-label">Discord Token:</label>
+                            <input type="password" class="form-control" id="discordToken" placeholder="Enter your Discord token">
+                            <div class="form-text">
+                                <a href="#" data-bs-toggle="modal" data-bs-target="#tokenHelpModal">How to find your token</a>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="channelId" class="form-label">Channel ID:</label>
+                            <input type="text" class="form-control" id="channelId" placeholder="Enter the Discord channel ID">
+                            <div class="form-text">
+                                <a href="#" data-bs-toggle="modal" data-bs-target="#channelIdHelpModal">How to find the channel ID</a>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="messageCount" class="form-label">Number of messages to analyze:</label>
+                            <input type="number" class="form-control" id="messageCount" value="100" min="10" max="1000">
+                        </div>
+                        
+                        <div class="mb-3 border-top pt-3">
+                            <label class="form-label">Auto-Refresh Settings:</label>
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="autoRefreshToggle">
+                                    <label class="form-check-label" for="autoRefreshToggle">Enable Auto-Refresh</label>
+                                </div>
+                                <span id="autoRefreshStatus" class="badge bg-secondary ms-3">Auto-refresh: Inactive</span>
+                            </div>
+                            <div class="input-group" style="max-width: 300px;">
+                                <span class="input-group-text">Refresh every</span>
+                                <input type="number" class="form-control" id="refreshInterval" value="60" min="60" max="600">
+                                <span class="input-group-text">seconds</span>
+                            </div>
+                            <div class="form-text text-warning">
+                                <i class="bi bi-exclamation-triangle"></i> 
+                                Minimum 60 seconds interval to avoid Discord rate limits
+                            </div>
+                        </div>
+                        
+                        <button id="startAnalysisBtn" class="btn btn-discord">Start Analysis</button>
+                    </div>
+                </div>
+                
+                <div id="summaryContainer" class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Stock Summary</h5>
+                        <div>
+                            <button id="exportBtn" class="btn btn-sm btn-outline-secondary">Export Data</button>
+                            <button id="refreshBtn" class="btn btn-sm btn-outline-primary ms-2">Refresh Data</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-4">
+                            <h6 id="summaryTimestamp"></h6>
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-sm btn-outline-secondary timeframeBtn active" data-timeframe="all">All</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary timeframeBtn" data-timeframe="1d">24h</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary timeframeBtn" data-timeframe="4h">4h</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary timeframeBtn" data-timeframe="1h">1h</button>
+                            </div>
+                        </div>
+                        
+                        <div id="topTickersContainer">
+                            <h6 class="mb-3">Top Trending Tickers:</h6>
+                            <div id="topTickers" class="mb-4"></div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card mb-3">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">Sentiment Overview</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <canvas id="sentimentChart" width="400" height="300"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card mb-3">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">Top Mentions</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <canvas id="mentionsChart" width="400" height="300"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <h6 class="mb-3">Detailed Analysis:</h6>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Ticker</th>
+                                        <th>Mentions</th>
+                                        <th>Sentiment</th>
+                                        <th>Users</th>
+                                        <th>Recent Context</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detailedTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Mobile navbar -->
+    <div class="d-md-none mobile-navbar fixed-bottom bg-light border-top">
+        <div class="container">
+            <div class="row text-center py-2">
+                <div class="col">
+                    <button id="mobileRefreshBtn" class="btn btn-link text-dark p-0">
+                        <i class="bi bi-arrow-clockwise"></i><br>
+                        <small>Refresh</small>
+                    </button>
+                </div>
+                <div class="col">
+                    <button id="mobileAutoRefreshBtn" class="btn btn-link text-dark p-0">
+                        <i class="bi bi-play-circle"></i><br>
+                        <small>Auto</small>
+                    </button>
+                </div>
+                <div class="col">
+                    <button id="mobileExportBtn" class="btn btn-link text-dark p-0">
+                        <i class="bi bi-download"></i><br>
+                        <small>Export</small>
+                    </button>
+                </div>
+                <div class="col">
+                    <button id="mobileSettingsBtn" class="btn btn-link text-dark p-0" data-bs-toggle="modal" data-bs-target="#settingsModal">
+                        <i class="bi bi-gear"></i><br>
+                        <small>Settings</small>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile settings modal -->
+    <div class="modal fade" id="settingsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Settings</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Token and channel settings -->
+                    <div class="mb-3">
+                        <label for="modalDiscordToken" class="form-label">Discord Token:</label>
+                        <input type="password" class="form-control" id="modalDiscordToken">
+                    </div>
+                    <div class="mb-3">
+                        <label for="modalChannelId" class="form-label">Channel ID:</label>
+                        <input type="text" class="form-control" id="modalChannelId">
+                    </div>
+                    <div class="mb-3">
+                        <label for="modalMessageCount" class="form-label">Messages to analyze:</label>
+                        <input type="number" class="form-control" id="modalMessageCount" value="100" min="10" max="1000">
+                    </div>
+                    
+                    <!-- Auto-refresh settings -->
+                    <div class="mb-3 border-top pt-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="modalAutoRefreshToggle">
+                            <label class="form-check-label" for="modalAutoRefreshToggle">Enable Auto-Refresh</label>
+                        </div>
+                        <div class="input-group mt-2" style="max-width: 100%;">
+                            <span class="input-group-text">Refresh every</span>
+                            <input type="number" class="form-control" id="modalRefreshInterval" value="60" min="60" max="600">
+                            <span class="input-group-text">seconds</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <p id="mobileTimestamp" class="small text-muted me-auto"></p>
+                    <button type="button" class="btn btn-primary" id="saveSettingsBtn">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Token Help Modal -->
+    <div class="modal fade" id="tokenHelpModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">How to Find Your Discord Token</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>IMPORTANT: Never share your token with anyone!</strong></p>
+                    <ol>
+                        <li>Open Discord in your web browser (not the app)</li>
+                        <li>Press F12 to open Developer Tools</li>
+                        <li>Go to the "Application" tab</li>
+                        <li>Under "Storage" on the left, click on "Local Storage" and then "https://discord.com"</li>
+                        <li>Find the "token" key and copy its value</li>
+                    </ol>
+                    <p class="text-danger">Note: Using your token in unauthorized ways violates Discord's Terms of Service. This tool only uses it locally in your browser to fetch messages.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Channel ID Help Modal -->
+    <div class="modal fade" id="channelIdHelpModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">How to Find the Channel ID</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <ol>
+                        <li>Open Discord</li>
+                        <li>Go to User Settings ⚙️ &gt; Advanced</li>
+                        <li>Enable "Developer Mode"</li>
+                        <li>Go back to Discord and right-click on the channel you want to analyze</li>
+                        <li>Click "Copy ID"</li>
+                        <li>Paste the ID in the Channel ID field</li>
+                    </ol>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pull-to-refresh indicator -->
+    <div class="pull-to-refresh">Pull down to refresh</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
